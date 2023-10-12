@@ -1,0 +1,71 @@
+# This workflow will do a clean install of node dependencies, build the source code and run tests across different versions of node
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
+
+name: Continuous Integration
+
+on: [push, pull_request]
+
+jobs:
+    build:
+        defaults:
+            run:
+                shell: bash
+
+        strategy:
+            matrix:
+                # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+                node-version: [18.x, 20.x]
+                os: [ubuntu-latest, windows-latest, macos-latest]
+
+        name: Node.js ${{ matrix.node-version }} on ${{ matrix.os }}
+
+        runs-on: ${{ matrix.os }}
+
+        steps:
+            - name: Checkout on ${{ runner.os }}
+              uses: actions/checkout@v3
+
+            - name: Use Node.js v${{ matrix.node-version }}
+              uses: actions/setup-node@v3
+              with:
+                  node-version: ${{ matrix.node-version }}
+
+            - name: Enable Corepack
+              run: corepack enable
+
+            - name: Cache node_modules
+              uses: actions/cache@v3
+              with:
+                  path: ./node_modules
+                  key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+                      ${{ runner.os }}-node-${{ matrix.node-version }}
+
+            - name: Get Yarn cache directory
+              id: yarn-cache
+              run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+
+            - name: Cache Yarn folder
+              uses: actions/cache@v3
+              with:
+                  path: ${{ steps.yarn-cache.outputs.dir }}
+                  key: ${{ runner.os }}-yarn-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-yarn-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+                      ${{ runner.os }}-yarn-${{ matrix.node-version }}
+
+            - name: Cache Yarn install state
+              uses: actions/cache@v3
+              with:
+                  path: ./.yarn/install-state.gz
+                  key: ${{ runner.os }}-yarn-install-state-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-yarn-install-state-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+                      ${{ runner.os }}-yarn-install-state-${{ matrix.node-version }}
+
+            - name: Install Dependencies
+              run: yarn install
+
+            - name: Build Packages
+              run: yarn build
